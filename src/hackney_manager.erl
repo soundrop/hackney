@@ -39,6 +39,8 @@
 new_request(InitialState) ->
     gen_server:call(?MODULE, {new_request, self(), InitialState}).
 
+-spec cancel_request(hackney:client() | hackney:client_ref()) ->
+	req_not_found | {term(), term(), term(), term()} | term().
 cancel_request(#client{request_ref=Ref}) ->
     cancel_request(Ref);
 cancel_request(Ref) when is_reference(Ref) ->

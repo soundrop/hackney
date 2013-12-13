@@ -39,8 +39,14 @@
 -opaque client() :: #client{}.
 -export_type([client/0]).
 
--type client_ref() :: term().
+-type client_ref() :: reference().
 -export_type([client_ref/0]).
+
+-type request() :: {term(), term(), term(), term()}.
+-export_type([request/0]).
+
+-type response() :: {error, term()} | {ok, Status::integer(), Header::[term()], client() | client_ref() }.
+-export_type([response/0]).
 
 %% @doc Start the couchbeam process. Useful when testing using the shell.
 start() ->
@@ -233,6 +239,7 @@ request(Method, URL, Headers, Body, Options)
 
 %% @doc send a request using the current client state
 
+-spec send_request(client_ref() | client(), request()) -> response().
 send_request(Ref, Req) when is_reference(Ref) ->
     case hackney_manager:get_state(Ref) of
         req_not_found ->
@@ -476,8 +483,6 @@ maybe_proxy(Transport, Host, Port, Options)
     end.
 
 
-maybe_redirect({ok, _}=Resp, _Req, _Tries) ->
-    Resp;
 maybe_redirect({ok, S, H, #client{follow_redirect=true,
                                   max_redirect=Max,
                                   force_redirect=ForceRedirect}=Client}=Resp,

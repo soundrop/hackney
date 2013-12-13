@@ -20,6 +20,7 @@
 
 -define(CHUNK_SIZE, 20480).
 
+-spec perform(hackney:client(), hackney:request()) -> hackney:response().
 perform(Client0, {Method0, Path, Headers0, Body0}) ->
     Method = hackney_util:to_upper(hackney_util:to_binary(Method0)),
 
