@@ -1,4 +1,5 @@
-REBAR?=./rebar
+>REBAR?=./rebar
+PACKAGE=hackney
 
 all: build
 
@@ -33,3 +34,9 @@ devdeps:
 
 
 .PHONY: doc deps
+
+init_plt:
+	dialyzer --build_plt --output_plt .$(PACKAGE).plt --apps erts kernel stdlib crypto compiler
+
+dialyzer:
+	dialyzer --plt .$(PACKAGE).plt --src  -r src
