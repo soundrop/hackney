@@ -203,9 +203,5 @@ token(<< C, Rest/binary >>, Fun, Case, Acc) ->
 %%
 %%
 content_type(Name) ->
-    case mimetypes:filename(Name) of
-        [CT | _] ->
-            CT;
-        CT when is_binary(CT) ->
-            CT
-    end.
+	[CT | _] = mimetypes:filename(Name),
+	CT.
