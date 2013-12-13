@@ -38,7 +38,7 @@
         scheme,
         netloc,
         raw_path,
-        path,
+        path = <<"/">>,
         qs = <<>>,
         fragment = <<>>,
         host,
