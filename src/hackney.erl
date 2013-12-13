@@ -238,7 +238,6 @@ request(Method, URL, Headers, Body, Options)
 
 
 %% @doc send a request using the current client state
-
 -spec send_request(client_ref() | client(), request()) -> response().
 send_request(Ref, Req) when is_reference(Ref) ->
     case hackney_manager:get_state(Ref) of
@@ -252,7 +251,10 @@ send_request(#client{response_state=done}=Client0 ,
     Client = Client0#client{response_state=start, body_state=waiting},
     send_request(Client, {Method, Path, Headers, Body});
 
-send_request(Client0, {Method, Path, Headers, Body}=Req) ->
+send_request(Client0, Req) ->
+	send_request(Client0, Req, true).
+
+send_request(Client0, {Method, Path, Headers, Body}=Req, Redirect) ->
     case hackney_connect:maybe_connect(Client0) of
         {ok, Client} ->
             case {Client#client.response_state, Client#client.body_state} of
@@ -261,7 +263,7 @@ send_request(Client0, {Method, Path, Headers, Body}=Req) ->
                                                             Path,
                                                             Headers,
                                                             Body}),
-                    Reply = maybe_redirect(Resp, Req, 0),
+                    Reply = maybe_redirect(Resp, Req, Redirect, 0),
                     reply_response(Reply, Client);
                 _ ->
                     {error, invalide_state}
@@ -482,11 +484,10 @@ maybe_proxy(Transport, Host, Port, Options)
             hackney_connect:connect(Transport, Host, Port, Options, true)
     end.
 
-
 maybe_redirect({ok, S, H, #client{follow_redirect=true,
                                   max_redirect=Max,
                                   force_redirect=ForceRedirect}=Client}=Resp,
-               Req, Tries) when Tries < Max ->
+               Req, true, Tries) when Tries < Max ->
 
     {Method, _Path, Headers, Body} = Req,
     case lists:member(S, [301, 302, 307]) of
@@ -502,11 +503,11 @@ maybe_redirect({ok, S, H, #client{follow_redirect=true,
                 {_, true} ->
                         NewReq = {Method, Location, Headers, Body},
                         maybe_redirect(redirect(Client, NewReq), Req,
-                                       Tries+1);
+                                       true, Tries+1);
                 {_, _} when ForceRedirect =:= true ->
                         NewReq = {Method, Location, Headers, Body},
                         maybe_redirect(redirect(Client, NewReq), Req,
-                                       Tries+1);
+                                       true, Tries+1);
                 {_, _} ->
                     {ok, {maybe_redirect, S, H, Client}}
             end;
@@ -519,7 +520,7 @@ maybe_redirect({ok, S, H, #client{follow_redirect=true,
                     {error, {invalid_redirection, Resp}};
                 {_, post} ->
                     NewReq = {get, Location, [], <<>>},
-                    maybe_redirect(redirect(Client, NewReq), Req, Tries+1);
+                    maybe_redirect(redirect(Client, NewReq), Req, true, Tries+1);
                 {_, _} ->
 
                     {error, {invalid_redirection, Resp}}
@@ -528,17 +529,17 @@ maybe_redirect({ok, S, H, #client{follow_redirect=true,
             Resp
     end;
 maybe_redirect({ok, S, _H, #client{follow_redirect=true}}=Resp,
-               _Req, _Tries) ->
+               _Req, true, _Tries) ->
     case lists:member(S, [301, 302, 303, 307]) of
         true ->
             {error, {max_redirect_overflow, Resp}};
         false ->
             Resp
     end;
-maybe_redirect(Resp, _Req, _Tries) ->
+maybe_redirect(Resp, _Req, true, _Tries) ->
     Resp.
 
-
+-spec redirect(client(), request()) -> response().
 redirect(Client0, {Method, NewLocation, Headers, Body}) ->
     %% skip the body
     {ok, Client} = hackney_response:skip_body(Client0),
@@ -556,17 +557,13 @@ redirect(Client0, {Method, NewLocation, Headers, Body}) ->
             options=Opts0,
             redirect=Redirect} = Client,
 
-    Opts = lists:keystore(follow_redirect, 1, Opts0,
-                          {follow_redirect, false}),
-
     %% update the state with the redirect info
     Client1 = Client#client{transport=RedirectTransport,
                             host=RedirectHost,
-                            port=RedirectPort,
-                            options=Opts},
+                            port=RedirectPort},
 
     %% send a request to the new location
-    case send_request(Client1, RedirectRequest) of
+    case send_request(Client1, RedirectRequest, false) of
         {ok,  S, H, RedirectRef} when is_reference(RedirectRef) ->
             RedirectState = hackney_manager:get_state(RedirectRef),
             RedirectState1 = case Redirect of
