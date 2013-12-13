@@ -265,7 +265,7 @@ handle_cast(_Msg, Children) ->
 
 handle_info({'EXIT', Pid, Reason}, Children) ->
     NChildren = case dict:find(Pid, Children) of
-        {value, Ref} ->
+        {ok, Ref} ->
             case ets:lookup(?MODULE, Ref) of
                 [] ->
                     dict:erase(Pid, Children);
